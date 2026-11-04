@@ -1,8 +1,8 @@
 # n8n on Render (free tier) - classroom blueprint
 #
 # After the first deploy, open the web service in the Render dashboard,
-# copy its public URL (https://<name>.onrender.com) and fill in the three
-# env vars marked "sync: false". Then trigger a manual deploy.
+# copy its public URL (https://<name>.onrender.com) and add the env var
+# N8N_WEBHOOK_URL with that value. Render redeploys automatically.
 
 services:
   - type: web
@@ -49,13 +49,9 @@ services:
         value: https
       - key: N8N_PROXY_HOPS          # Render sits in front as a reverse proxy
         value: "1"
-      # Fill these in from the dashboard after the first deploy:
-      - key: N8N_HOST                # e.g. n8n-service-abcd.onrender.com
-        sync: false
-      - key: N8N_EDITOR_BASE_URL     # e.g. https://n8n-service-abcd.onrender.com/
-        sync: false
-      - key: N8N_WEBHOOK_URL         # same value as N8N_EDITOR_BASE_URL
-        sync: false
+      # N8N_WEBHOOK_URL is NOT set here on purpose. The public URL does not
+      # exist until the service is created, so students add it by hand in
+      # the dashboard after the first deploy (Step 3 of the course guide).
 
       # ---- task runners: slow cold starts need a longer grant window ----
       - key: N8N_RUNNERS_GRANT_TOKEN_TTL
