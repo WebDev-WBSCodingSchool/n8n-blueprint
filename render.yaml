@@ -92,7 +92,7 @@ services:
         value: "1000"
 
       - key: GENERIC_TIMEZONE
-        value: America/Mexico_City   # change to your timezone
+        value: Europe/Berlin   # change to your timezone
 
 databases:
   - name: n8n-db
