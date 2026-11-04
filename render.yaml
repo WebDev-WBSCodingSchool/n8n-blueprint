@@ -1,67 +1,101 @@
-# Use this Blueprint to deploy n8n on Render as a web
-# service that uses a Postgres database to store
-# workflow data.
+# n8n on Render (free tier) - classroom blueprint
 #
-# This Blueprint uses free instance types (specified by
-# `plan`) for both the web service and the database. You
-# can upgrade to paid instance types at any time to
-# increase resources.
+# After the first deploy, open the web service in the Render dashboard,
+# copy its public URL (https://<name>.onrender.com) and fill in the three
+# env vars marked "sync: false". Then trigger a manual deploy.
 
 services:
   - type: web
     plan: free
-    # This is the runtime for services that pull a prebuilt Docker image
     runtime: image
-    # You can give the service any name
     name: n8n-service
     image:
-      # Pulls the n8n image tagged as latest from Docker Hub
-      url: docker.io/n8nio/n8n:latest
+      # Pinned on purpose: "latest" can pull a new major version and
+      # re-run migrations under you in the middle of class.
+      url: docker.io/n8nio/n8n:2.46.6
 
-    # All environment variables defined below are required!
-    #
-    # You can define additional environment variables as needed.
+    # Lets Render wait until n8n is really up instead of guessing from
+    # the first open port. Avoids the "restarting deploy" loop during
+    # migrations.
+    healthCheckPath: /healthz
+
     envVars:
-      # Generates a base64-encoded key for
-      # encrypting credentials in n8n
-      #
-      # Do not modify this value after it's generated!
-      # If you do, you'll lose access to all credentials
-      # encrypted with the previous value.
+      # ---- required, do not change after first deploy ----
       - key: N8N_ENCRYPTION_KEY
         generateValue: true
 
-      # These automatically populate connection details 
-      # for the Render Postgres database defined below
+      # ---- database (auto-wired to the Postgres below) ----
       - key: DB_TYPE
         value: postgresdb
       - key: DB_POSTGRESDB_DATABASE
-        fromDatabase:
-          name: n8n-db
-          property: database
+        fromDatabase: { name: n8n-db, property: database }
       - key: DB_POSTGRESDB_HOST
-        fromDatabase:
-          name: n8n-db
-          property: host
+        fromDatabase: { name: n8n-db, property: host }
       - key: DB_POSTGRESDB_PASSWORD
-        fromDatabase:
-          name: n8n-db
-          property: password
+        fromDatabase: { name: n8n-db, property: password }
       - key: DB_POSTGRESDB_USER
-        fromDatabase:
-          name: n8n-db
-          property: user
+        fromDatabase: { name: n8n-db, property: user }
+
+      # ---- memory: the free box has 512 MB total ----
       - key: NODE_OPTIONS
-        value: --max-old-space-size=400
+        value: --max-old-space-size=360
+
+      # ---- networking / proxy ----
+      - key: PORT
+        value: "5678"
+      - key: N8N_PORT
+        value: "5678"
+      - key: N8N_PROTOCOL
+        value: https
+      - key: N8N_PROXY_HOPS          # Render sits in front as a reverse proxy
+        value: "1"
+      # Fill these in from the dashboard after the first deploy:
+      - key: N8N_HOST                # e.g. n8n-service-abcd.onrender.com
+        sync: false
+      - key: N8N_EDITOR_BASE_URL     # e.g. https://n8n-service-abcd.onrender.com/
+        sync: false
+      - key: N8N_WEBHOOK_URL         # same value as N8N_EDITOR_BASE_URL
+        sync: false
+
+      # ---- task runners: slow cold starts need a longer grant window ----
+      - key: N8N_RUNNERS_GRANT_TOKEN_TTL
+        value: "180"
+      - key: N8N_RUNNERS_TASK_TIMEOUT
+        value: "300"
+
+      # ---- keep the database small and memory low ----
+      - key: EXECUTIONS_DATA_PRUNE
+        value: "true"
+      - key: EXECUTIONS_DATA_MAX_AGE
+        value: "72"
+      - key: EXECUTIONS_DATA_PRUNE_MAX_COUNT
+        value: "300"
+      - key: EXECUTIONS_DATA_SAVE_ON_PROGRESS
+        value: "false"
+
+      # ---- turn off things that cost memory or make outbound calls ----
+      - key: N8N_DIAGNOSTICS_ENABLED
+        value: "false"
+      - key: N8N_VERSION_NOTIFICATIONS_ENABLED
+        value: "false"
+      - key: N8N_TEMPLATES_ENABLED
+        value: "false"
+      - key: N8N_PERSONALIZATION_ENABLED
+        value: "false"
+      - key: N8N_COMMUNITY_PACKAGES_ENABLED
+        value: "false"
+      - key: N8N_UNVERIFIED_PACKAGES_ENABLED
+        value: "false"
+      - key: N8N_COMPRESSION_NODE_MAX_DECOMPRESSED_SIZE_BYTES
+        value: "268435456"
+      - key: N8N_COMPRESSION_NODE_MAX_ZIP_ENTRIES
+        value: "1000"
+
+      - key: GENERIC_TIMEZONE
+        value: America/Mexico_City   # change to your timezone
 
 databases:
   - name: n8n-db
     plan: free
-    # The free instance type is limited to 1 GB of disk
-    # space.
-    #
-    # If you later upgrade to a paid instance type, you can
-    # increase the disk size to any multiple of 5 GB by
-    # setting the `diskSizeGB` property.
-    #
-    # diskSizeGB: 5
+    # NOTE: free Render Postgres expires 30 days after creation and is
+    # deleted 14 days later. Export workflows before then, or upgrade.
